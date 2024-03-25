@@ -3,10 +3,10 @@
 Done by: Sherman Ng Wei Sheng
 
 ## Requirements
-<u>Tested on the following hardware</u>
-Device: Jetson Nano Developer Kit
-Ubuntu Version: 18.04
-Python Version: 3.9.16
+<u>Tested on the following hardware / software</u>:<br/>
+Device: Jetson Nano Developer Kit<br/>
+Ubuntu Version: 18.04<br/>
+Python Version: 3.9.16<br/>
 
 ## Directory Description
 1. `pico-venv`: contains the python virtual environment with the python dependencies required to run the code
