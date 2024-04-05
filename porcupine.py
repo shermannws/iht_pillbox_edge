@@ -86,7 +86,7 @@ def handle_led(t):
 
 def start_blink(led, times):
     for i in range(times):
-        print("here")
+        print("blinking")
         GPIO.output(led, GPIO.HIGH)
         time.sleep(0.5)
         GPIO.output(led, GPIO.LOW)
@@ -99,7 +99,7 @@ client.on_message = on_message
 client.on_subscribe = on_subscribe
 
 try:
-    client.connect(MQTT_IP_ADDR, MQTT_PORT, 60)
+    client.connect(MQTT_IP_ADDR, int(MQTT_PORT), 60)
     is_mqtt_enabled = True
     client.loop_start()
 except:
