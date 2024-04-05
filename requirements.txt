@@ -1,0 +1,8 @@
+hx711==0.1
+Jetson.GPIO==2.1.6
+logzero==1.7.0
+paho-mqtt==2.0.0
+pvcheetah==2.0.1
+pvporcupine==3.0.2
+PyAudio==0.2.14
+python-dotenv==1.0.1

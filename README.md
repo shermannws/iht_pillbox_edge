@@ -12,14 +12,22 @@ Python Version: 3.9.16<br/>
 1. `pico-venv`: contains the python virtual environment with the python dependencies required to run the code
 2. `*.ppn`: contains the machine learning model for pico-voice to detect the wake-words
 3. `porcupine.py`: entry point to run the edge program
+4. `requirements.txt`: necessary python packages
 
 ## How to Run
-1. Start the virtual environment
+1. Prepare the environment variables. The following environment variables should be present in the `.env` file.
+```
+PICO_API_KEY=\<ACCESS KEY TO PICOVOICE>
+MQTT_IP_ADDR=\<IP ADDRESS OF MQTT BROKER>
+MQTT_PORT=\<PORT OF MQTT BROKER>
+```
+2. Start the virtual environment / or create one and ensure that all requirements are installed
 ```bash
 source pico-venv/bin/activate
+pip install -r requirements.txt
 ```
-2. Start the script
+3. Start the script
 ```bash
 python porcupine.py
 ```
-3. When prompted, key in the patient ID that is assigned this pillbox
+4. When prompted, key in the patient ID that is assigned this pillbox

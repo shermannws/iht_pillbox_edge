@@ -7,6 +7,13 @@ import json
 import paho.mqtt.client as mqtt
 from hx711 import HX711
 
+from dotenv import dotenv_values
+
+config = dotenv_values(".env")
+PICO_API_KEY = config["PICO_API_KEY"]
+MQTT_IP_ADDR = config["MQTT_IP_ADDR"]
+MQTT_PORT = config["MQTT_PORT"]
+
 #hx711 setup
 import sys
 import gpiod
@@ -21,22 +28,21 @@ def cleanAndExit():
     print("Bye!")
     sys.exit()
 
+# Commented out due load cell malfunctioning
 #hx_before = HX711(dout = 15, pd_sck = 13, chip = chip)
 #referenceUnit_before = 9.7392
-hx_after = HX711(dout = 23, pd_sck = 21, chip = chip)
-referenceUnit_after = 118
-
 #hx_before.set_reading_format("MSB", "MSB")
-hx_after.set_reading_format("MSB", "MSB")
-
 #hx_before.set_reference_unit(referenceUnit_before)
-hx_after.set_reference_unit(referenceUnit_after)
-
 #hx_before.reset()
-hx_after.reset()
+#hx_before.tare(50)
 
-#hx_before.tare()
-hx_after.tare()
+hx_after = HX711(dout = 23, pd_sck = 21, chip = chip)
+referenceUnit_after = 160
+hx_after.set_reading_format("MSB", "MSB")
+hx_after.set_reference_unit(referenceUnit_after)
+hx_after.reset()
+hx_after.tare(50)
+weight_of_pillbox = 2
 
 def get_weight(hx):
     val = hx.get_weight(11)
@@ -93,16 +99,14 @@ client.on_message = on_message
 client.on_subscribe = on_subscribe
 
 try:
-    #client.connect('192.168.1.177', 1883, 60)
-    client.connect('192.168.50.177', 1883, 60)
+    client.connect(MQTT_IP_ADDR, MQTT_PORT, 60)
     is_mqtt_enabled = True
     client.loop_start()
 except:
     is_mqtt_enabled = False
-    print("there")
 
 #pico setup
-access_key = 'TkrVuBilUvGh7RBxRcfRpWBb+vwa2Fr62pmMKa4QffGqV+edroOM+g=='
+access_key = PICO_API_KEY
 before_model = '/home/edge-01/Desktop/iht_project/picovoice/Before-Food_en_jetson_v3_0_0.ppn'
 after_model ='/home/edge-01/Desktop/iht_project/picovoice/After-Food_en_jetson_v3_0_0.ppn'
 porcupine = pvporcupine.create(
@@ -112,7 +116,7 @@ porcupine = pvporcupine.create(
 pa = None
 audio_stream = None
 
-#gpio setup
+#gpio led setup
 before_pin = 7
 after_pin = 11
 GPIO.setmode(GPIO.BOARD) 
@@ -141,19 +145,22 @@ before_state = 0 #0 nothing; 1 pill putting; 2 not consumed
 after_state = 0
 before_weight = None
 after_weight = None
+before_pill_weight = None
+after_pill_weight = None
 
-def cross_threshold(current, ref):
-    threshold = 2
-    return abs(current - ref) > threshold
+def cross_threshold(current, ref, threshold):
+    return ref - current > threshold
 
 def wait_for_pill(hx, led):
     before = get_weight(hx)
     GPIO.output(led, GPIO.HIGH)
-    threshold = 2
+    threshold = weight_of_pillbox
     while True:
         next = get_weight(hx)
-        if abs(next-before) > 2:
-            return next
+        print("before: ", before)
+        print("next: ", next)
+        if next-before > threshold:
+            return next-before
         
     
 
@@ -161,11 +168,11 @@ while True:
     try:
         keyword_index = porcupine.process(get_next_audio_frame())
         if keyword_index == 0 and before_state == 0:
-            print("before detected")
+            print("before wake word detected")
             before_state += 1
             continue
         elif keyword_index == 1 and after_state == 0:
-            print("after detected")
+            print("after wake word detected")
             after_state += 1
             continue
 
@@ -174,7 +181,8 @@ while True:
             #handle before pill tracking
             print("waiting for before pills")
             before_weight = wait_for_pill(hx_after, before_pin)
-            payload = {"patient_id":patient_id, "action":"before_new", "weight":before_weight}
+            before_pill_weight = before_weight-weight_of_pillbox
+            payload = {"patient_id":patient_id, "action":"before_new", "weight":before_pill_weight}
             client.publish('pills/status',payload=json.dumps(payload),qos=0)
             GPIO.output(before_pin, GPIO.LOW)
             before_state += 1
@@ -183,7 +191,8 @@ while True:
             #handle after pill tracking
             print("waiting for before pills")
             after_weight = wait_for_pill(hx_after, after_pin)
-            payload = {"patient_id":patient_id, "action":"after_new", "weight":after_weight}
+            after_pill_weight = after_weight-weight_of_pillbox
+            payload = {"patient_id":patient_id, "action":"after_new", "weight":after_pill_weight}
             client.publish('pills/status',payload=json.dumps(payload),qos=0)
             GPIO.output(after_pin, GPIO.LOW)
             after_state += 1
@@ -192,22 +201,24 @@ while True:
         if before_state == 2:
             print("checking if before decreased")
             current_weight = get_weight(hx_after)
-            if cross_threshold(current_weight, before_weight):
+            if cross_threshold(current_weight, before_weight, before_pill_weight):
                 print("Before Weight decreased!")
                 payload = {"patient_id":patient_id, "action":"before_take"}
                 client.publish('pills/status', payload=json.dumps(payload), qos=0)
                 before_state = 0
                 before_weight = None
+                before_pill_weight = None
                 
         if after_state == 2:
             print("checking if after decreased")
             current_weight = get_weight(hx_after)
-            if cross_threshold(current_weight, after_weight):
+            if cross_threshold(current_weight, after_weight, after_pill_weight):
                 print("After Weight decreased!")
                 payload = {"patient_id":patient_id, "action":"after_take"}
                 client.publish('pills/status', payload=json.dumps(payload), qos=0)
                 after_state = 0
                 after_weight = None
+                after_pill_weight = None
 
     except (KeyboardInterrupt, SystemExit):
         cleanAndExit()
