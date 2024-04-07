@@ -24,7 +24,6 @@ ROBOFLOW_API_KEY=\<API KEY TO ROBOFLOW>
 ```
 2. Start the virtual environment / or create one and ensure that all requirements are installed
 ```bash
-source pico-venv/bin/activate
 pip install -r requirements.txt
 ```
 3. Start the script that contains the pill detection model
