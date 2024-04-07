@@ -1,2 +1,4 @@
 extra/
 .env
+
+pico-venv/

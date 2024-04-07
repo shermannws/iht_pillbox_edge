@@ -14,6 +14,33 @@ PICO_API_KEY = config["PICO_API_KEY"]
 MQTT_IP_ADDR = config["MQTT_IP_ADDR"]
 MQTT_PORT = config["MQTT_PORT"]
 
+# UDP socket setup
+import socket
+import ast
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+udp_host = '127.0.0.1'
+udp_port = 12345
+
+sock.bind((udp_host, udp_port))
+sock.settimeout(5)
+
+def is_pill_taken():
+    try:
+        data, addr = sock.recvfrom(1024)
+    except socket.timeout:
+        print("no transmission, assume taken")
+        return True
+
+    data_decoded = ast.literal_eval(data.decode())
+    if (len(data_decoded["predictions"])) == 0:
+        return True
+    for p in data_decoded["predictions"]:
+        if p["confidence"] > 0.5:
+            return False
+    return True
+
 #hx711 setup
 import sys
 import gpiod
@@ -201,7 +228,7 @@ while True:
         if before_state == 2:
             print("checking if before decreased")
             current_weight = get_weight(hx_after)
-            if cross_threshold(current_weight, before_weight, before_pill_weight):
+            if cross_threshold(current_weight, before_weight, before_pill_weight) and is_pill_taken():
                 print("Before Weight decreased!")
                 payload = {"patient_id":patient_id, "action":"before_take"}
                 client.publish('pills/status', payload=json.dumps(payload), qos=0)
@@ -212,7 +239,7 @@ while True:
         if after_state == 2:
             print("checking if after decreased")
             current_weight = get_weight(hx_after)
-            if cross_threshold(current_weight, after_weight, after_pill_weight):
+            if cross_threshold(current_weight, after_weight, after_pill_weight) and is_pill_taken():
                 print("After Weight decreased!")
                 payload = {"patient_id":patient_id, "action":"after_take"}
                 client.publish('pills/status', payload=json.dumps(payload), qos=0)
@@ -224,6 +251,7 @@ while True:
         cleanAndExit()
         client.loop_stop()
         GPIO.cleanup()
+        sock.close()
 
 
 
